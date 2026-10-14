@@ -18,7 +18,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.14
+          gradle-version: current
 
       - name: Unzip
         run: for z in capemod-fabric-*.zip; do unzip -oq "$z"; done
@@ -30,6 +30,7 @@ jobs:
 
       - name: Build ${{ matrix.version }}
         working-directory: fabric-${{ matrix.version }}
+        shell: bash
         run: |
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
