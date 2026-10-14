@@ -15,13 +15,27 @@ jobs:
         with:
           gradle-version: current
       - name: Unzip
-        run: for z in capemod-fabric-*.zip; do unzip -q "$z"; done
+        run: for z in capemod-fabric-*.zip; do unzip -oq "$z"; done
       - name: Build 1.21.8
         continue-on-error: true
-        run: cd fabric-1.21.8 && gradle build
+        shell: bash
+        run: cd fabric-1.21.8 && gradle build --stacktrace 2>&1 | tee build.log
       - name: Build 1.21.4
         continue-on-error: true
-        run: cd fabric-1.21.4 && gradle build
+        shell: bash
+        run: cd fabric-1.21.4 && gradle build --stacktrace 2>&1 | tee build.log
+      - name: Report result
+        if: always()
+        shell: bash
+        run: |
+          for v in 1.21.8 1.21.4; do
+            if ls fabric-$v/build/libs/*.jar >/dev/null 2>&1; then
+              echo "::notice title=$v::jar built OK"
+            else
+              err=$(grep -E "error:|What went wrong|Could not|FAILED|Caused by" -A2 fabric-$v/build.log | head -12 | tr '\n' ' ' | tr -d '%')
+              echo "::error title=$v FAILED::$err"
+            fi
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
