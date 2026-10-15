@@ -3,8 +3,6 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -15,38 +13,29 @@ jobs:
         with:
           gradle-version: current
       - name: Unzip
-        run: for z in capemod-fabric-*.zip; do unzip -oq "$z"; done
-      - name: Build 1.21.8
-        continue-on-error: true
-        shell: bash
-        run: cd fabric-1.21.8 && gradle build --stacktrace 2>&1 | tee build.log
-      - name: Build 1.21.4
-        continue-on-error: true
-        shell: bash
-        run: cd fabric-1.21.4 && gradle build --stacktrace 2>&1 | tee build.log
-      - name: Report result
-        if: always()
-        shell: bash
         run: |
-          for v in 1.21.8 1.21.4; do
-            if ls fabric-$v/build/libs/*.jar >/dev/null 2>&1; then
-              echo "::notice title=$v::jar built OK"
-            else
-              err=$(grep -E "error:|What went wrong|Could not|FAILED|Caused by" -A2 fabric-$v/build.log | head -12 | tr '\n' ' ' | tr -d '%')
-              echo "::error title=$v FAILED::$err"
-            fi
-          done
+          unzip -q -o capemod-fabric-1.21.4.zip
+          unzip -q -o capemod-fabric-1.21.8.zip
+      - name: Build 1.21.4
+        run: cd fabric-1.21.4 && gradle build --console=plain 2>&1 | tee ../b4.log; exit ${PIPESTATUS[0]}
+        shell: bash
+        continue-on-error: true
+      - name: Build 1.21.8
+        run: cd fabric-1.21.8 && gradle build --console=plain 2>&1 | tee ../b8.log; exit ${PIPESTATUS[0]}
+        shell: bash
+        continue-on-error: true
+      - name: Show errors
+        if: always()
+        run: |
+          echo '### Errors' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -hE "error:|What went wrong|Could not" -A4 b4.log b8.log | head -60 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: jars
           path: |
-            fabric-*/build/libs/*.jar
+            fabric-1.21.4/build/libs/*.jar
+            fabric-1.21.8/build/libs/*.jar
             !fabric-*/build/libs/*-sources.jar
-      - uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Cape Mod build ${{ github.run_number }}
-          files: |
-            fabric-*/build/libs/*.jar
